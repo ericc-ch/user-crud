@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
   Breadcrumb,
@@ -7,22 +7,20 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
-import {
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
-import { authClient } from "@/lib/auth-client"
-import { useRouter } from "next/navigation"
+} from "@/components/ui/breadcrumb";
+import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { authClient } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
 
 export default function Page() {
-  const router = useRouter()
+  const router = useRouter();
 
   const handleLogout = async () => {
-    await authClient.signOut()
-    router.push("/auth/signin")
-  }
+    await authClient.signOut();
+    router.push("/auth/signin");
+  };
 
   return (
     <>
@@ -57,8 +55,8 @@ export default function Page() {
           <div className="bg-muted/50 aspect-video rounded-xl" />
           <div className="bg-muted/50 aspect-video rounded-xl" />
         </div>
-        <div className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min" />
+        <div className="bg-muted/50 min-h-screen flex-1 rounded-xl md:min-h-min" />
       </div>
     </>
-  )
+  );
 }

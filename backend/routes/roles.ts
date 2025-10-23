@@ -2,7 +2,7 @@ import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { db } from "@/lib/db";
 import { roles } from "@/schemas/roles.sql";
 import { requireAuth, requirePermission } from "@/backend/middleware/auth";
-import { eq } from "drizzle-orm";
+import { eq, like, asc, desc, count, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 
 type Variables = {
@@ -43,18 +43,52 @@ const ParamSchema = z.object({
   }),
 });
 
+const QuerySchema = z.object({
+  page: z.coerce.number().min(1).default(1).openapi({
+    param: { name: "page", in: "query" },
+    example: 1,
+  }),
+  pageSize: z.coerce.number().min(1).max(100).default(10).openapi({
+    param: { name: "pageSize", in: "query" },
+    example: 10,
+  }),
+  search: z.string().optional().openapi({
+    param: { name: "search", in: "query" },
+    example: "admin",
+  }),
+  sortBy: z.enum(["name", "createdAt"]).default("createdAt").openapi({
+    param: { name: "sortBy", in: "query" },
+    example: "createdAt",
+  }),
+  sortOrder: z.enum(["asc", "desc"]).default("desc").openapi({
+    param: { name: "sortOrder", in: "query" },
+    example: "desc",
+  }),
+});
+
+const RolesListResponseSchema = z.object({
+  data: z.array(RoleSchema),
+  total: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+  totalPages: z.number(),
+}).openapi("RolesListResponse");
+
 const listRoute = createRoute({
   method: "get",
   path: "/",
   tags: ["Roles"],
+  request: {
+    query: QuerySchema,
+  },
   responses: {
     200: {
       content: {
         "application/json": {
-          schema: z.array(RoleSchema),
+          schema: RolesListResponseSchema,
         },
       },
-      description: "List all roles",
+      description: "List roles with pagination and filtering",
     },
     401: {
       content: {
@@ -191,13 +225,42 @@ const deleteRouteConfig = createRoute({
 app.use("*", requireAuth);
 
 app.openapi(listRoute, async (c) => {
-  const allRoles = await db.select().from(roles);
+  const { page, pageSize, search, sortBy, sortOrder } = c.req.valid("query");
+
+  let query = db.select().from(roles);
+
+  if (search) {
+    query = query.where(like(roles.name, `%${search}%`)) as typeof query;
+  }
+
+  const orderColumn = sortBy === "name" ? roles.name : roles.createdAt;
+  const orderFn = sortOrder === "asc" ? asc : desc;
+  query = query.orderBy(orderFn(orderColumn)) as typeof query;
+
+  const offset = (page - 1) * pageSize;
+  const allRoles = await query.limit(pageSize).offset(offset);
+
+  const [totalResult] = await db
+    .select({ count: count() })
+    .from(roles)
+    .where(search ? like(roles.name, `%${search}%`) : sql`1=1`);
+
+  const total = totalResult.count;
+  const totalPages = Math.ceil(total / pageSize);
+
   const serialized = allRoles.map((role) => ({
     ...role,
     createdAt: role.createdAt.getTime(),
     updatedAt: role.updatedAt.getTime(),
   }));
-  return c.json(serialized, 200);
+
+  return c.json({
+    data: serialized,
+    total,
+    page,
+    pageSize,
+    totalPages,
+  }, 200);
 });
 
 app.openapi(getRoute, async (c) => {
@@ -217,7 +280,7 @@ app.openapi(getRoute, async (c) => {
   return c.json(serialized, 200);
 });
 
-app.use("/", requirePermission("roles:create"));
+app.use("/", requirePermission("roles:write"));
 app.openapi(createRouteConfig, async (c) => {
   const body = c.req.valid("json");
 

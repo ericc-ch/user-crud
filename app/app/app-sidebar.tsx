@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { usePathname } from "next/navigation"
+import * as React from "react";
+import { usePathname } from "next/navigation";
 
 import {
   Sidebar,
@@ -14,7 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 // This is sample data.
 const data = {
@@ -25,18 +25,18 @@ const data = {
   management: [
     {
       title: "Users",
-      url: "/users",
+      url: "/app/users",
     },
     {
       title: "Roles",
-      url: "/roles",
+      url: "/app/roles",
     },
   ],
-}
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const pathname = usePathname()
-  
+  const pathname = usePathname();
+
   return (
     <Sidebar {...props}>
       <SidebarHeader>
@@ -49,7 +49,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === data.dashboard.url}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === data.dashboard.url}
+                >
                   <a href={data.dashboard.url}>{data.dashboard.title}</a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -73,5 +76,5 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarRail />
     </Sidebar>
-  )
+  );
 }

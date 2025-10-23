@@ -14,6 +14,10 @@ export const requireAuth = async (c: Context, next: Next) => {
 export const requirePermission = (permission: string) => {
   return async (c: Context, next: Next) => {
     const user = c.get("user");
+    
+    if (!user) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
 
     const userRolesList = await db
       .select({ permissions: roles.permissions })
