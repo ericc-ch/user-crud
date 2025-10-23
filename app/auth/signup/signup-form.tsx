@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-export function LoginForm({
+export function SignupForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
@@ -23,16 +23,18 @@ export function LoginForm({
       _prevState: { error: string } | null,
       formData: FormData
     ): Promise<{ error: string } | null> => {
+      const name = formData.get("name") as string;
       const email = formData.get("email") as string;
       const password = formData.get("password") as string;
 
-      const { error } = await authClient.signIn.email({
+      const { error } = await authClient.signUp.email({
+        name,
         email,
         password,
       });
 
       if (error) {
-        return { error: error.message || "Login failed" };
+        return { error: error.message || "Signup failed" };
       }
 
       redirect("/app");
@@ -47,11 +49,22 @@ export function LoginForm({
           <form action={formAction} className="p-6">
             <FieldGroup>
               <div className="flex flex-col items-center gap-2 text-center">
-                <h1 className="text-2xl font-bold">Welcome back</h1>
+                <h1 className="text-2xl font-bold">Create an account</h1>
                 <p className="text-muted-foreground text-balance">
-                  Login to your account
+                  Sign up to get started
                 </p>
               </div>
+              <Field>
+                <FieldLabel htmlFor="name">Name</FieldLabel>
+                <Input
+                  id="name"
+                  name="name"
+                  type="text"
+                  placeholder="John Doe"
+                  required
+                  disabled={isPending}
+                />
+              </Field>
               <Field>
                 <FieldLabel htmlFor="email">Email</FieldLabel>
                 <Input
@@ -78,13 +91,13 @@ export function LoginForm({
               )}
               <Field>
                 <Button type="submit" disabled={isPending}>
-                  {isPending ? "Logging in..." : "Login"}
+                  {isPending ? "Signing up..." : "Sign up"}
                 </Button>
               </Field>
               <FieldDescription className="text-center">
-                Don&apos;t have an account?{" "}
-                <a href="/signup" className="underline">
-                  Sign up
+                Already have an account?{" "}
+                <a href="/auth/signin" className="underline">
+                  Log in
                 </a>
               </FieldDescription>
             </FieldGroup>
