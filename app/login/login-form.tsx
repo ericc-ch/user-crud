@@ -35,7 +35,7 @@ export function LoginForm({
         return { error: error.message || "Login failed" };
       }
 
-      redirect("/");
+      redirect("/app");
     },
     null
   );

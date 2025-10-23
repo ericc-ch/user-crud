@@ -37,7 +37,7 @@ export function SignupForm({
         return { error: error.message || "Signup failed" };
       }
 
-      redirect("/");
+      redirect("/app");
     },
     null
   );
