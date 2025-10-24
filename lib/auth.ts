@@ -12,5 +12,7 @@ export const auth = betterAuth({
     usePlural: true,
     camelCase: true,
   }),
-  plugins: [openAPI()],
+  plugins: [
+    openAPI(),
+  ],
 });
