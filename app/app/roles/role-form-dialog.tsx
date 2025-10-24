@@ -1,10 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useTransition } from "react";
+import { useActionState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { createRole, updateRole } from "./actions";
+import { createRoleAction, updateRoleAction } from "./actions";
 
 const AVAILABLE_PERMISSIONS = [
   "users:read",
@@ -28,13 +25,6 @@ const AVAILABLE_PERMISSIONS = [
   "roles:write",
   "roles:delete",
 ] as const;
-
-const roleFormInputSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  permissions: z.array(z.string()),
-});
-
-type RoleFormInputValues = z.infer<typeof roleFormInputSchema>;
 
 interface RoleFormDialogProps {
   open: boolean;
@@ -53,7 +43,7 @@ export function RoleFormDialog({
   onOpenChange,
   role,
 }: RoleFormDialogProps) {
-  const [isPending, startTransition] = useTransition();
+  const formRef = React.useRef<HTMLFormElement>(null);
 
   const defaultPermissions = React.useMemo(() => {
     if (!role) return [];
@@ -65,69 +55,53 @@ export function RoleFormDialog({
     }
   }, [role]);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm<RoleFormInputValues>({
-    resolver: zodResolver(roleFormInputSchema),
-    defaultValues: {
-      name: role?.name || "",
-      permissions: defaultPermissions,
-    },
-  });
+  const [selectedPermissions, setSelectedPermissions] = React.useState<string[]>(
+    defaultPermissions
+  );
 
-  const selectedPermissions = watch("permissions");
+  const createAction = createRoleAction.bind(null);
+  const updateAction = role ? updateRoleAction.bind(null, role.id) : null;
+
+  const [createState, createFormAction, createPending] = useActionState(
+    createAction,
+    null
+  );
+  const [updateState, updateFormAction, updatePending] = useActionState(
+    updateAction || createAction,
+    null
+  );
+
+  const state = role ? updateState : createState;
+  const formAction = role ? updateFormAction : createFormAction;
+  const isPending = role ? updatePending : createPending;
+
+  React.useEffect(() => {
+    if (state?.success) {
+      onOpenChange(false);
+      formRef.current?.reset();
+      setSelectedPermissions([]);
+    }
+  }, [state?.success, onOpenChange]);
 
   React.useEffect(() => {
     if (open) {
-      reset({
-        name: role?.name || "",
-        permissions: defaultPermissions,
-      });
+      setSelectedPermissions(defaultPermissions);
+      formRef.current?.reset();
     }
-  }, [open, role, defaultPermissions, reset]);
+  }, [open, defaultPermissions]);
 
   const togglePermission = (permission: string) => {
-    const current = selectedPermissions || [];
-    if (current.includes(permission)) {
-      setValue(
-        "permissions",
-        current.filter((p) => p !== permission)
-      );
-    } else {
-      setValue("permissions", [...current, permission]);
-    }
-  };
-
-  const onSubmit = async (data: RoleFormInputValues) => {
-    startTransition(async () => {
-      try {
-        if (role) {
-          await updateRole(role.id, {
-            name: data.name,
-            permissions: data.permissions,
-          });
-        } else {
-          await createRole({
-            name: data.name,
-            permissions: data.permissions,
-          });
-        }
-        onOpenChange(false);
-      } catch (error) {
-        console.error("Error saving role:", error);
-      }
-    });
+    setSelectedPermissions((current) =>
+      current.includes(permission)
+        ? current.filter((p) => p !== permission)
+        : [...current, permission]
+    );
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form ref={formRef} action={formAction}>
           <DialogHeader>
             <DialogTitle>{role ? "Edit Role" : "Create Role"}</DialogTitle>
             <DialogDescription>
@@ -137,14 +111,20 @@ export function RoleFormDialog({
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            {state?.error && (
+              <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+                {state.error}
+              </div>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="name">Name</Label>
-              <Input id="name" placeholder="Admin" {...register("name")} />
-              {errors.name && (
-                <p className="text-sm text-destructive">
-                  {errors.name.message}
-                </p>
-              )}
+              <Input
+                id="name"
+                name="name"
+                placeholder="Admin"
+                defaultValue={role?.name}
+                required
+              />
             </div>
             <div className="grid gap-2">
               <Label>Permissions</Label>
@@ -153,7 +133,9 @@ export function RoleFormDialog({
                   <div key={permission} className="flex items-center space-x-2">
                     <Checkbox
                       id={permission}
-                      checked={selectedPermissions?.includes(permission)}
+                      name="permissions"
+                      value={permission}
+                      checked={selectedPermissions.includes(permission)}
                       onCheckedChange={() => togglePermission(permission)}
                     />
                     <Label
@@ -165,11 +147,6 @@ export function RoleFormDialog({
                   </div>
                 ))}
               </div>
-              {errors.permissions && (
-                <p className="text-sm text-destructive">
-                  {errors.permissions.message}
-                </p>
-              )}
             </div>
           </div>
           <DialogFooter>

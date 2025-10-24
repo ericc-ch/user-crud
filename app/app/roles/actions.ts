@@ -19,42 +19,61 @@ async function getAuthHeaders() {
   }
 }
 
-export async function createRole(data: { name: string; permissions: string[] }) {
+type FormState = {
+  error?: string
+  success?: boolean
+}
+
+export async function createRoleAction(_prevState: FormState | null, formData: FormData): Promise<FormState> {
+  const name = formData.get('name') as string
+  const permissions = formData.getAll('permissions') as string[]
+
+  if (!name) {
+    return { error: "Name is required" }
+  }
+
   const baseUrl = await getBaseUrl()
   const headers = await getAuthHeaders()
   
   const res = await fetch(`${baseUrl}/api/roles`, {
     method: "POST",
     headers,
-    body: JSON.stringify(data),
+    body: JSON.stringify({ name, permissions }),
   })
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: "Failed to create role" }))
-    throw new Error(error.error || "Failed to create role")
+    return { error: error.error || "Failed to create role" }
   }
 
   revalidatePath("/app/roles")
-  return await res.json()
+  return { success: true }
 }
 
-export async function updateRole(id: string, data: { name?: string; permissions?: string[] }) {
+export async function updateRoleAction(id: string, _prevState: FormState | null, formData: FormData): Promise<FormState> {
+  const name = formData.get('name') as string
+  const permissions = formData.getAll('permissions') as string[]
+
+  if (!name) {
+    return { error: "Name is required" }
+  }
+
   const baseUrl = await getBaseUrl()
   const headers = await getAuthHeaders()
   
   const res = await fetch(`${baseUrl}/api/roles/${id}`, {
     method: "PUT",
     headers,
-    body: JSON.stringify(data),
+    body: JSON.stringify({ name, permissions }),
   })
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: "Failed to update role" }))
-    throw new Error(error.error || "Failed to update role")
+    return { error: error.error || "Failed to update role" }
   }
 
   revalidatePath("/app/roles")
-  return await res.json()
+  return { success: true }
 }
 
 export async function deleteRole(id: string) {
