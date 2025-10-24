@@ -223,6 +223,7 @@ const deleteRouteConfig = createRoute({
 });
 
 app.use("*", requireAuth);
+app.use("*", requirePermission("roles:read"));
 
 app.openapi(listRoute, async (c) => {
   const { page, pageSize, search, sortBy, sortOrder } = c.req.valid("query");
@@ -310,7 +311,7 @@ app.openapi(createRouteConfig, async (c) => {
   return c.json(serialized, 201);
 });
 
-app.use("/:id", requirePermission("roles:update"));
+app.use("/:id", requirePermission("roles:write"));
 app.openapi(updateRouteConfig, async (c) => {
   const { id } = c.req.valid("param");
   const body = c.req.valid("json");

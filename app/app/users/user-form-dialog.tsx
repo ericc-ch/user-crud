@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useActionState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { createUserAction, updateUserAction } from "./actions";
+import { userMutations, userQueries } from "@/lib/queries/users.queries";
 
 type Role = {
   id: string;
@@ -44,39 +44,49 @@ export function UserFormDialog({
   roles,
   onSuccess,
 }: UserFormDialogProps) {
+  const queryClient = useQueryClient();
   const formRef = React.useRef<HTMLFormElement>(null);
+  const [error, setError] = React.useState<string | null>(null);
   const [selectedRoleIds, setSelectedRoleIds] = React.useState<string[]>(
     user?.roleIds || []
   );
 
-  const createAction = createUserAction.bind(null);
-  const updateAction = user ? updateUserAction.bind(null, user.id) : null;
-
-  const [createState, createFormAction, createPending] = useActionState(
-    createAction,
-    null
-  );
-  const [updateState, updateFormAction, updatePending] = useActionState(
-    updateAction || createAction,
-    null
-  );
-
-  const state = user ? updateState : createState;
-  const formAction = user ? updateFormAction : createFormAction;
-  const isPending = user ? updatePending : createPending;
-
-  React.useEffect(() => {
-    if (state?.success) {
+  const createMutation = useMutation({
+    mutationFn: userMutations.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userQueries.lists() });
       onOpenChange(false);
       formRef.current?.reset();
       setSelectedRoleIds([]);
+      setError(null);
       onSuccess?.();
-    }
-  }, [state?.success, onOpenChange, onSuccess]);
+    },
+    onError: (error: Error) => {
+      setError(error.message);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: userMutations.update,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userQueries.lists() });
+      onOpenChange(false);
+      formRef.current?.reset();
+      setSelectedRoleIds([]);
+      setError(null);
+      onSuccess?.();
+    },
+    onError: (error: Error) => {
+      setError(error.message);
+    },
+  });
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
   React.useEffect(() => {
     if (open) {
       setSelectedRoleIds(user?.roleIds || []);
+      setError(null);
       formRef.current?.reset();
     }
   }, [open, user]);
@@ -89,10 +99,38 @@ export function UserFormDialog({
     );
   };
 
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const name = formData.get("name") as string;
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+
+    if (user) {
+      updateMutation.mutate({
+        id: user.id,
+        name,
+        email,
+        roleIds: selectedRoleIds,
+      });
+    } else {
+      if (!password || password.length < 8) {
+        setError("Password must be at least 8 characters");
+        return;
+      }
+      createMutation.mutate({
+        name,
+        email,
+        password,
+        roleIds: selectedRoleIds,
+      });
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
-        <form ref={formRef} action={formAction}>
+        <form ref={formRef} onSubmit={handleSubmit} key={user?.id || 'create'}>
           <DialogHeader>
             <DialogTitle>{user ? "Edit User" : "Create User"}</DialogTitle>
             <DialogDescription>
@@ -102,9 +140,9 @@ export function UserFormDialog({
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            {state?.error && (
+            {error && (
               <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
-                {state.error}
+                {error}
               </div>
             )}
             <div className="grid gap-2">

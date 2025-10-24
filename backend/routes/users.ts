@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users } from "@/schemas/auth.sql";
 import { userRoles } from "@/schemas/roles.sql";
-import { eq, like, asc, desc, count, sql } from "drizzle-orm";
+import { eq, like, asc, desc, count, sql, inArray } from "drizzle-orm";
 
 type Variables = {
   user: typeof auth.$Infer.Session.user | null;
@@ -22,6 +22,7 @@ const UserSchema = z
     image: z.string().nullable().openapi({ example: null }),
     createdAt: z.number().openapi({ example: 1698765432000 }),
     updatedAt: z.number().openapi({ example: 1698765432000 }),
+    roleIds: z.array(z.string()).optional().openapi({ example: ["role_123"] }),
   })
   .openapi("User");
 
@@ -257,6 +258,22 @@ app.openapi(listRoute, async (c) => {
   const total = totalResult.count;
   const totalPages = Math.ceil(total / pageSize);
 
+  const userIds = allUsers.map(u => u.id);
+  let rolesByUserId: Record<string, string[]> = {};
+  
+  if (userIds.length > 0) {
+    const userRolesData = await db
+      .select()
+      .from(userRoles)
+      .where(inArray(userRoles.userId, userIds));
+
+    rolesByUserId = userRolesData.reduce((acc, ur) => {
+      if (!acc[ur.userId]) acc[ur.userId] = [];
+      acc[ur.userId].push(ur.roleId);
+      return acc;
+    }, {} as Record<string, string[]>);
+  }
+
   const serialized = allUsers.map((user) => ({
     id: user.id,
     name: user.name,
@@ -265,6 +282,7 @@ app.openapi(listRoute, async (c) => {
     image: user.image || null,
     createdAt: user.createdAt.getTime(),
     updatedAt: user.updatedAt.getTime(),
+    roleIds: rolesByUserId[user.id] || [],
   }));
 
   return c.json({

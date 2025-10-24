@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useActionState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { createRoleAction, updateRoleAction } from "./actions";
+import { roleMutations, roleQueries } from "@/lib/queries/roles.queries";
 
 const AVAILABLE_PERMISSIONS = [
   "users:read",
@@ -45,7 +45,9 @@ export function RoleFormDialog({
   role,
   onSuccess,
 }: RoleFormDialogProps) {
+  const queryClient = useQueryClient();
   const formRef = React.useRef<HTMLFormElement>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   const defaultPermissions = React.useMemo(() => {
     if (!role) return [];
@@ -61,34 +63,42 @@ export function RoleFormDialog({
     defaultPermissions
   );
 
-  const createAction = createRoleAction.bind(null);
-  const updateAction = role ? updateRoleAction.bind(null, role.id) : null;
-
-  const [createState, createFormAction, createPending] = useActionState(
-    createAction,
-    null
-  );
-  const [updateState, updateFormAction, updatePending] = useActionState(
-    updateAction || createAction,
-    null
-  );
-
-  const state = role ? updateState : createState;
-  const formAction = role ? updateFormAction : createFormAction;
-  const isPending = role ? updatePending : createPending;
-
-  React.useEffect(() => {
-    if (state?.success) {
+  const createMutation = useMutation({
+    mutationFn: roleMutations.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: roleQueries.lists() });
       onOpenChange(false);
       formRef.current?.reset();
       setSelectedPermissions([]);
+      setError(null);
       onSuccess?.();
-    }
-  }, [state?.success, onOpenChange, onSuccess]);
+    },
+    onError: (error: Error) => {
+      setError(error.message);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: roleMutations.update,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: roleQueries.lists() });
+      onOpenChange(false);
+      formRef.current?.reset();
+      setSelectedPermissions([]);
+      setError(null);
+      onSuccess?.();
+    },
+    onError: (error: Error) => {
+      setError(error.message);
+    },
+  });
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
   React.useEffect(() => {
     if (open) {
       setSelectedPermissions(defaultPermissions);
+      setError(null);
       formRef.current?.reset();
     }
   }, [open, defaultPermissions]);
@@ -101,10 +111,29 @@ export function RoleFormDialog({
     );
   };
 
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const name = formData.get("name") as string;
+
+    if (role) {
+      updateMutation.mutate({
+        id: role.id,
+        name,
+        permissions: selectedPermissions,
+      });
+    } else {
+      createMutation.mutate({
+        name,
+        permissions: selectedPermissions,
+      });
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
-        <form ref={formRef} action={formAction}>
+        <form ref={formRef} onSubmit={handleSubmit} key={role?.id || 'create'}>
           <DialogHeader>
             <DialogTitle>{role ? "Edit Role" : "Create Role"}</DialogTitle>
             <DialogDescription>
@@ -114,9 +143,9 @@ export function RoleFormDialog({
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            {state?.error && (
+            {error && (
               <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
-                {state.error}
+                {error}
               </div>
             )}
             <div className="grid gap-2">

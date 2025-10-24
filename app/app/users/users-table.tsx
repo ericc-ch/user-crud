@@ -1,14 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
 import { Plus } from "lucide-react"
 import { DataTable } from "./data-table"
 import { getColumns, type User } from "./columns"
 import { UserFormDialog } from "./user-form-dialog"
 import { Button } from "@/components/ui/button"
-import { deleteUser } from "./actions"
-import { userQueries } from "@/lib/queries/users.queries"
+import { userMutations, userQueries } from "@/lib/queries/users.queries"
 
 export function UsersTable() {
   const queryClient = useQueryClient()
@@ -39,6 +38,13 @@ export function UsersTable() {
 
   const { data: roles = [] } = useQuery(userQueries.roles())
 
+  const deleteMutation = useMutation({
+    mutationFn: userMutations.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userQueries.lists() })
+    },
+  })
+
   const handleEdit = (user: User) => {
     setEditingUser(user)
   }
@@ -46,12 +52,7 @@ export function UsersTable() {
   const handleDelete = async (user: User) => {
     if (!confirm(`Are you sure you want to delete "${user.name}"?`)) return
 
-    try {
-      await deleteUser(user.id)
-      queryClient.invalidateQueries({ queryKey: userQueries.lists() })
-    } catch (error) {
-      console.error("Error deleting user:", error)
-    }
+    deleteMutation.mutate(user.id)
   }
 
   const columns = getColumns(handleEdit, handleDelete)

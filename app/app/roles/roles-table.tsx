@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { DataTable } from "./data-table";
 import { getColumns, type Role } from "./columns";
 import { RoleFormDialog } from "./role-form-dialog";
 import { Button } from "@/components/ui/button";
-import { deleteRole } from "./actions";
-import { roleQueries } from "@/lib/queries/roles.queries";
+import { roleMutations, roleQueries } from "@/lib/queries/roles.queries";
 
 export function RolesTable() {
   const queryClient = useQueryClient();
@@ -37,6 +36,13 @@ export function RolesTable() {
     }),
   );
 
+  const deleteMutation = useMutation({
+    mutationFn: roleMutations.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: roleQueries.lists() });
+    },
+  });
+
   const handleEdit = (role: Role) => {
     setEditingRole(role);
   };
@@ -44,12 +50,7 @@ export function RolesTable() {
   const handleDelete = async (role: Role) => {
     if (!confirm(`Are you sure you want to delete "${role.name}"?`)) return;
 
-    try {
-      await deleteRole(role.id);
-      queryClient.invalidateQueries({ queryKey: roleQueries.lists() });
-    } catch (error) {
-      console.error("Error deleting role:", error);
-    }
+    deleteMutation.mutate(role.id);
   };
 
   const columns = getColumns(handleEdit, handleDelete);

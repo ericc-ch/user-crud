@@ -1,5 +1,7 @@
 import { queryOptions } from "@tanstack/react-query"
 
+const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+
 export type Role = {
   id: string
   name: string
@@ -33,7 +35,6 @@ async function fetchRoles(params: RolesListParams): Promise<RolesResponse> {
     sortOrder: params.sortOrder,
   })
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
   const res = await fetch(`${baseUrl}/api/roles?${queryParams}`, {
     credentials: "include",
   })
@@ -45,6 +46,68 @@ async function fetchRoles(params: RolesListParams): Promise<RolesResponse> {
   return res.json()
 }
 
+export type CreateRoleInput = {
+  name: string
+  permissions: string[]
+}
+
+export type UpdateRoleInput = {
+  id: string
+  name: string
+  permissions: string[]
+}
+
+async function createRole(input: CreateRoleInput): Promise<Role> {
+  const res = await fetch(`${baseUrl}/api/roles`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify(input),
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: "Failed to create role" }))
+    throw new Error(error.error || "Failed to create role")
+  }
+
+  return res.json()
+}
+
+async function updateRole(input: UpdateRoleInput): Promise<Role> {
+  const res = await fetch(`${baseUrl}/api/roles/${input.id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify({
+      name: input.name,
+      permissions: input.permissions,
+    }),
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: "Failed to update role" }))
+    throw new Error(error.error || "Failed to update role")
+  }
+
+  return res.json()
+}
+
+async function deleteRole(id: string): Promise<void> {
+  const res = await fetch(`${baseUrl}/api/roles/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: "Failed to delete role" }))
+    throw new Error(error.error || "Failed to delete role")
+  }
+}
+
 export const roleQueries = {
   all: () => ["roles"],
   lists: () => [...roleQueries.all(), "list"],
@@ -53,4 +116,10 @@ export const roleQueries = {
       queryKey: [...roleQueries.lists(), params],
       queryFn: () => fetchRoles(params),
     }),
+}
+
+export const roleMutations = {
+  create: createRole,
+  update: updateRole,
+  delete: deleteRole,
 }
