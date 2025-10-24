@@ -2,6 +2,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { swaggerUI } from "@hono/swagger-ui";
 import { auth } from "@/lib/auth";
 import rolesRouter from "./routes/roles";
+import usersRouter from "./routes/users";
 
 export const app = new OpenAPIHono<{
   Variables: {
@@ -29,6 +30,7 @@ app.on(["POST", "GET"], "/auth/*", (c) => {
 });
 
 app.route("/roles", rolesRouter);
+app.route("/users", usersRouter);
 
 app.get("/doc", async (c) => {
   const betterAuthSchema = await auth.api.generateOpenAPISchema();
