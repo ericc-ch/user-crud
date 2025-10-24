@@ -1,65 +1,69 @@
-"use client"
+"use client";
 
-import { use, useState, useMemo, useTransition } from "react"
-import { useQueryStates, parseAsInteger, parseAsString } from "nuqs"
-import { Plus } from "lucide-react"
-import { DataTable } from "./data-table"
-import { getColumns, type Role } from "./columns"
-import { RoleFormDialog } from "./role-form-dialog"
-import { Button } from "@/components/ui/button"
-import { deleteRole } from "./actions"
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus } from "lucide-react";
+import { DataTable } from "./data-table";
+import { getColumns, type Role } from "./columns";
+import { RoleFormDialog } from "./role-form-dialog";
+import { Button } from "@/components/ui/button";
+import { deleteRole } from "./actions";
+import { roleQueries } from "@/lib/queries/roles.queries";
 
-type RolesResponse = {
-  data: Role[]
-  total: number
-  page: number
-  pageSize: number
-  totalPages: number
-}
+export function RolesTable() {
+  const queryClient = useQueryClient();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState<Role | undefined>(undefined);
 
-type RolesTableProps = {
-  rolesPromise: Promise<RolesResponse>
-}
+  const [params, setParams] = useState({
+    page: 1,
+    pageSize: 10,
+    search: null as string | null,
+    sortBy: "createdAt",
+    sortOrder: "desc",
+  });
 
-export function RolesTable({ rolesPromise }: RolesTableProps) {
-  const response = use(rolesPromise)
-  const [isPending, startTransition] = useTransition()
-  
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [editingRole, setEditingRole] = useState<Role | undefined>(undefined)
+  const handleParamsChange = (values: Partial<typeof params>) => {
+    setParams((prev) => ({ ...prev, ...values }));
+  };
 
-  const [params, setParams] = useQueryStates({
-    page: parseAsInteger.withDefault(1),
-    pageSize: parseAsInteger.withDefault(10),
-    search: parseAsString,
-    sortBy: parseAsString.withDefault("createdAt"),
-    sortOrder: parseAsString.withDefault("desc"),
-  })
+  const { data: rolesData, isPending } = useQuery(
+    roleQueries.list({
+      page: params.page,
+      pageSize: params.pageSize,
+      search: params.search,
+      sortBy: params.sortBy,
+      sortOrder: params.sortOrder,
+    }),
+  );
 
   const handleEdit = (role: Role) => {
-    setEditingRole(role)
-  }
+    setEditingRole(role);
+  };
 
   const handleDelete = async (role: Role) => {
-    if (!confirm(`Are you sure you want to delete "${role.name}"?`)) return
+    if (!confirm(`Are you sure you want to delete "${role.name}"?`)) return;
 
-    startTransition(async () => {
-      try {
-        await deleteRole(role.id)
-      } catch (error) {
-        console.error("Error deleting role:", error)
-      }
-    })
-  }
+    try {
+      await deleteRole(role.id);
+      queryClient.invalidateQueries({ queryKey: roleQueries.lists() });
+    } catch (error) {
+      console.error("Error deleting role:", error);
+    }
+  };
 
-  const columns = useMemo(() => getColumns(handleEdit, handleDelete), [])
+  const columns = getColumns(handleEdit, handleDelete);
 
   const handleDialogClose = (open: boolean) => {
     if (!open) {
-      setIsCreateDialogOpen(false)
-      setEditingRole(undefined)
+      setIsCreateDialogOpen(false);
+      setEditingRole(undefined);
     }
-  }
+  };
+
+  const handleSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: roleQueries.lists() });
+  };
 
   return (
     <>
@@ -71,17 +75,18 @@ export function RolesTable({ rolesPromise }: RolesTableProps) {
       </div>
       <DataTable
         columns={columns}
-        data={response.data}
-        pageCount={response.totalPages}
+        data={rolesData?.data ?? []}
+        pageCount={rolesData?.totalPages ?? 0}
         params={params}
-        onParamsChange={setParams}
+        onParamsChange={handleParamsChange}
         isPending={isPending}
       />
       <RoleFormDialog
         open={isCreateDialogOpen || !!editingRole}
         onOpenChange={handleDialogClose}
         role={editingRole}
+        onSuccess={handleSuccess}
       />
     </>
-  )
+  );
 }

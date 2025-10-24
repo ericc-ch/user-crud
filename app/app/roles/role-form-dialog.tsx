@@ -36,12 +36,14 @@ interface RoleFormDialogProps {
         permissions: string;
       }
     | undefined;
+  onSuccess?: () => void;
 }
 
 export function RoleFormDialog({
   open,
   onOpenChange,
   role,
+  onSuccess,
 }: RoleFormDialogProps) {
   const formRef = React.useRef<HTMLFormElement>(null);
 
@@ -80,8 +82,9 @@ export function RoleFormDialog({
       onOpenChange(false);
       formRef.current?.reset();
       setSelectedPermissions([]);
+      onSuccess?.();
     }
-  }, [state?.success, onOpenChange]);
+  }, [state?.success, onOpenChange, onSuccess]);
 
   React.useEffect(() => {
     if (open) {

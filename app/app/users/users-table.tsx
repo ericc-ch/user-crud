@@ -1,41 +1,43 @@
 "use client"
 
-import { use, useState, useMemo, useTransition } from "react"
-import { useQueryStates, parseAsInteger, parseAsString } from "nuqs"
+import { useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Plus } from "lucide-react"
 import { DataTable } from "./data-table"
 import { getColumns, type User } from "./columns"
 import { UserFormDialog } from "./user-form-dialog"
 import { Button } from "@/components/ui/button"
 import { deleteUser } from "./actions"
+import { userQueries } from "@/lib/queries/users.queries"
 
-type UsersResponse = {
-  data: User[]
-  total: number
-  page: number
-  pageSize: number
-  totalPages: number
-}
-
-type UsersTableProps = {
-  usersPromise: Promise<UsersResponse>
-  roles: { id: string; name: string }[]
-}
-
-export function UsersTable({ usersPromise, roles }: UsersTableProps) {
-  const response = use(usersPromise)
-  const [isPending, startTransition] = useTransition()
-  
+export function UsersTable() {
+  const queryClient = useQueryClient()
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | undefined>(undefined)
 
-  const [params, setParams] = useQueryStates({
-    page: parseAsInteger.withDefault(1),
-    pageSize: parseAsInteger.withDefault(10),
-    search: parseAsString,
-    sortBy: parseAsString.withDefault("createdAt"),
-    sortOrder: parseAsString.withDefault("desc"),
+  const [params, setParams] = useState({
+    page: 1,
+    pageSize: 10,
+    search: null as string | null,
+    sortBy: "createdAt",
+    sortOrder: "desc",
   })
+
+  const handleParamsChange = (values: Partial<typeof params>) => {
+    setParams(prev => ({ ...prev, ...values }))
+  }
+
+  const { data: usersData, isPending } = useQuery(
+    userQueries.list({
+      page: params.page,
+      pageSize: params.pageSize,
+      search: params.search,
+      sortBy: params.sortBy,
+      sortOrder: params.sortOrder,
+    })
+  )
+
+  const { data: roles = [] } = useQuery(userQueries.roles())
 
   const handleEdit = (user: User) => {
     setEditingUser(user)
@@ -44,22 +46,25 @@ export function UsersTable({ usersPromise, roles }: UsersTableProps) {
   const handleDelete = async (user: User) => {
     if (!confirm(`Are you sure you want to delete "${user.name}"?`)) return
 
-    startTransition(async () => {
-      try {
-        await deleteUser(user.id)
-      } catch (error) {
-        console.error("Error deleting user:", error)
-      }
-    })
+    try {
+      await deleteUser(user.id)
+      queryClient.invalidateQueries({ queryKey: userQueries.lists() })
+    } catch (error) {
+      console.error("Error deleting user:", error)
+    }
   }
 
-  const columns = useMemo(() => getColumns(handleEdit, handleDelete), [])
+  const columns = getColumns(handleEdit, handleDelete)
 
   const handleDialogClose = (open: boolean) => {
     if (!open) {
       setIsCreateDialogOpen(false)
       setEditingUser(undefined)
     }
+  }
+
+  const handleSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: userQueries.lists() })
   }
 
   return (
@@ -72,10 +77,10 @@ export function UsersTable({ usersPromise, roles }: UsersTableProps) {
       </div>
       <DataTable
         columns={columns}
-        data={response.data}
-        pageCount={response.totalPages}
+        data={usersData?.data ?? []}
+        pageCount={usersData?.totalPages ?? 0}
         params={params}
-        onParamsChange={setParams}
+        onParamsChange={handleParamsChange}
         isPending={isPending}
       />
       <UserFormDialog
@@ -83,6 +88,7 @@ export function UsersTable({ usersPromise, roles }: UsersTableProps) {
         onOpenChange={handleDialogClose}
         user={editingUser}
         roles={roles}
+        onSuccess={handleSuccess}
       />
     </>
   )

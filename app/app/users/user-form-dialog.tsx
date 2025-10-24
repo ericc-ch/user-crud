@@ -34,6 +34,7 @@ interface UserFormDialogProps {
       }
     | undefined;
   roles: Role[];
+  onSuccess?: () => void;
 }
 
 export function UserFormDialog({
@@ -41,6 +42,7 @@ export function UserFormDialog({
   onOpenChange,
   user,
   roles,
+  onSuccess,
 }: UserFormDialogProps) {
   const formRef = React.useRef<HTMLFormElement>(null);
   const [selectedRoleIds, setSelectedRoleIds] = React.useState<string[]>(
@@ -68,8 +70,9 @@ export function UserFormDialog({
       onOpenChange(false);
       formRef.current?.reset();
       setSelectedRoleIds([]);
+      onSuccess?.();
     }
-  }, [state?.success, onOpenChange]);
+  }, [state?.success, onOpenChange, onSuccess]);
 
   React.useEffect(() => {
     if (open) {

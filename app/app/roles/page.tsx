@@ -1,5 +1,5 @@
-import { Suspense } from "react";
-import { cookies } from "next/headers";
+"use client"
+
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -11,74 +11,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { RolesTable } from "./roles-table";
-import { RolesTableSkeleton } from "./roles-table-skeleton";
 
-type Role = {
-  id: string;
-  name: string;
-  permissions: string;
-  createdAt: number;
-  updatedAt: number;
-};
-
-type RolesResponse = {
-  data: Role[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-};
-
-async function getRoles(searchParams: {
-  page?: string;
-  pageSize?: string;
-  search?: string;
-  sortBy?: string;
-  sortOrder?: string;
-}): Promise<RolesResponse> {
-  const params = new URLSearchParams({
-    page: searchParams.page || "1",
-    pageSize: searchParams.pageSize || "10",
-    ...(searchParams.search && { search: searchParams.search }),
-    sortBy: searchParams.sortBy || "createdAt",
-    sortOrder: searchParams.sortOrder || "desc",
-  });
-
-  const cookieStore = await cookies();
-  const cookieHeader = cookieStore
-    .getAll()
-    .map((cookie) => `${cookie.name}=${cookie.value}`)
-    .join("; ");
-
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-  const res = await fetch(`${baseUrl}/api/roles?${params}`, {
-    headers: {
-      Cookie: cookieHeader,
-    },
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    throw new Error("Failed to fetch roles");
-  }
-
-  return res.json();
-}
-
-export default async function RolesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{
-    page?: string;
-    pageSize?: string;
-    search?: string;
-    sortBy?: string;
-    sortOrder?: string;
-  }>;
-}) {
-  const params = await searchParams;
-  const rolesPromise = getRoles(params);
-
+export default function RolesPage() {
   return (
     <>
       <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
@@ -108,9 +42,7 @@ export default async function RolesPage({
             </p>
           </div>
         </div>
-        <Suspense fallback={<RolesTableSkeleton />}>
-          <RolesTable rolesPromise={rolesPromise} />
-        </Suspense>
+        <RolesTable />
       </div>
     </>
   );

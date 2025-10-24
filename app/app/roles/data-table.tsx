@@ -64,6 +64,18 @@ export function DataTable<TData, TValue>({
     getCoreRowModel: getCoreRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    onSortingChange: (updater) => {
+      const newSorting = typeof updater === 'function' 
+        ? updater([{ id: params.sortBy, desc: params.sortOrder === "desc" }])
+        : updater;
+      
+      if (newSorting.length > 0) {
+        onParamsChange({ 
+          sortBy: newSorting[0].id, 
+          sortOrder: newSorting[0].desc ? "desc" : "asc" 
+        });
+      }
+    },
     state: {
       pagination: {
         pageIndex: params.page - 1,
@@ -92,12 +104,9 @@ export function DataTable<TData, TValue>({
     }
   }, [pageSize, params.pageSize, onParamsChange]);
 
-  const handleSearchChange = React.useCallback(
-    (value: string) => {
-      onParamsChange({ search: value || null, page: 1 });
-    },
-    [onParamsChange],
-  );
+  const handleSearchChange = (value: string) => {
+    onParamsChange({ search: value || null, page: 1 });
+  };
 
   return (
     <div className="space-y-4">
@@ -107,7 +116,6 @@ export function DataTable<TData, TValue>({
           value={params.search ?? ""}
           onChange={(event) => handleSearchChange(event.target.value)}
           className="h-8 w-[150px] lg:w-[250px]"
-          disabled={isPending}
         />
         <DataTableViewOptions table={table} />
       </div>
@@ -135,7 +143,16 @@ export function DataTable<TData, TValue>({
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isPending ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  Loading...
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
