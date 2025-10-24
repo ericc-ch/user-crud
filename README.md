@@ -83,11 +83,19 @@ BETTER_AUTH_URL=http://localhost:3000
 bun run db:push
 ```
 
-### 5. Seed the database (optional)
+### 5. Seed the database
+
+**Important**: First sign up a user, then run the seed script to create default roles and assign admin role to the first user:
 
 ```bash
 bun run scripts/seed.ts
 ```
+
+This creates:
+- **Admin role** with all permissions
+- **Editor role** with limited permissions
+- **Viewer role** with read-only access
+- Assigns Admin role to the first registered user
 
 ### 6. Start the development server
 
@@ -96,6 +104,14 @@ bun run dev
 ```
 
 Visit http://localhost:3000
+
+## Live Demo
+
+Try the live demo at: **https://user-crud-seven-rho.vercel.app/**
+
+**Demo Credentials:**
+- Email: `admin@admin.com`
+- Password: `adminadmin`
 
 ## API Documentation
 
